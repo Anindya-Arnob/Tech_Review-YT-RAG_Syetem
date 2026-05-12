@@ -160,7 +160,7 @@ Run cells sequentially from top to bottom — each section builds on the previou
 
 **Anindya Roy Chowdhury**
 
-[![LinkedIn](https://www.linkedin.com/in/anindya-roy-chowdhury-929bb1255/)
+[![LinkedIn](www.linkedin.com/in/anindya-roy-chowdhury-929bb1255)
 
 ---
 
