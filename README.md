@@ -115,14 +115,6 @@ NLP pipeline** that automatically:
 git clone https://github.com/Anindya-Arnob/RAG-YouTube-Sentiment.git
 cd RAG-YouTube-Sentiment
 
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Configure MongoDB
-# Add your MongoDB connection string in the notebook config section
-
-# 4. Configure DeepL API
-# Add your DeepL API key in the notebook config section
 ```
 
 ---
