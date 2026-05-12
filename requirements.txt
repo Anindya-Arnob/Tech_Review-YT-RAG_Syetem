@@ -1,0 +1,21 @@
+# Core Dependencies
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+
+# NLP & Transformers
+transformers
+torch
+sentence-transformers
+nltk
+spacy
+
+# Topic Modeling
+bertopic
+gensim
+
+# Sentiment Analysis (Using RoBERTa)
+torch
+transformers
