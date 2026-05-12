@@ -23,9 +23,6 @@ NLP pipeline** that automatically:
 - 🏷️ Identifies product mentions automatically
 - 📝 Generates concise AI summaries using **Flan-T5**
 
-📖 **Read the full blog post:**
-[How AI Reads Customer Feedback — A RAG-Powered Approach to Sentiment Analysis](https://medium.com/@sriamirdhasudha/how-ai-reads-customer-feedback-a-rag-powered-approach-to-sentiment-analysis-f5900429cbbf)
-
 ---
 
 ## 🏗️ Project Architecture
