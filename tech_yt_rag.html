@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tech YouTube RAG — Product Sentiment Query</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #ffffff;
+    --bg-secondary:#f5f5f3;
+    --bg-tertiary: #eeede9;
+    --text:        #1a1a18;
+    --text-secondary: #6b6b67;
+    --text-tertiary:  #9f9f9a;
+    --border:     rgba(0,0,0,0.12);
+    --border-md:  rgba(0,0,0,0.22);
+    --radius-md:  8px;
+    --radius-lg:  12px;
+    --warn-bg:    #faeeda;
+    --warn-text:  #854f0b;
+    --warn-border:rgba(186,117,23,0.3);
+    --ok-bg:      #eaf3de;
+    --ok-text:    #3b6d11;
+    --ok-border:  rgba(99,153,34,0.3);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:          #1c1c1a;
+      --bg-secondary:#252523;
+      --bg-tertiary: #2e2e2b;
+      --text:        #f0efe9;
+      --text-secondary: #9f9f9a;
+      --text-tertiary:  #6b6b67;
+      --border:     rgba(255,255,255,0.1);
+      --border-md:  rgba(255,255,255,0.22);
+      --warn-bg:    #412402;
+      --warn-text:  #fac775;
+      --warn-border:rgba(250,199,117,0.3);
+      --ok-bg:      #173404;
+      --ok-text:    #c0dd97;
+      --ok-border:  rgba(192,221,151,0.3);
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-tertiary);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 3rem 1rem 5rem;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .wrap { width: 100%; max-width: 640px; }
+
+  /* ── VIDEO BACKGROUND ── */
+  #bg-video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.7; /* 👈 ADJUST: lower = more subtle, higher = more visible */
+  }
+
+  /* ── Particle canvas ── */
+  #bg-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* All page content floats above video + canvas */
+  body > .wrap { position: relative; z-index: 2; }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.6);
+    border: 0.5px solid rgba(255,255,255,0.5);
+    border-radius: 20px; padding: 4px 14px;
+    font-size: 12px; color: var(--text-secondary);
+    margin-bottom: 1rem;
+    box-shadow: 0 0 8px 2px rgba(255, 0, 0, 0.3) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    .badge {
+      background: rgba(40,40,38,0.65);
+      border-color: rgba(255,255,255,0.1);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+  }
+
+  .hero { margin-bottom: 1.75rem; }
+  .hero h1 { font-size: 26px; font-weight: 500; line-height: 1.25; margin-bottom: .3rem; }
+  .hero p  { font-size: 14px; color: var(--text-secondary); }
+
+  /* ── Status row ── */
+  .status-row { display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; border-radius: 20px; padding: 3px 10px; border: 0.5px solid;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .status-pill.checking { color: var(--text-secondary); border-color: var(--border); background: rgba(245,245,243,0.7); }
+  .status-pill.online   { color: var(--ok-text);   border-color: var(--ok-border);   background: rgba(234,243,222,0.1); font-weight: 600; box-shadow: 0 0 8px rgba(99, 153, 34, 0.7);}
+  .status-pill.offline  { color: var(--warn-text); border-color: var(--warn-border); background: rgba(180, 120, 60, 1.0);font-weight: 600;box-shadow: 0 0 8px 2px rgba(186, 117, 23, 0.6);}
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ── Glass cards ── */
+  .card,
+  .output-card {
+    background: rgba(15, 15, 20, 0.82);
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow:
+      0 2px 4px  rgba(0,0,0,0.04),
+      0 8px 16px rgba(0,0,0,0.10),
+      0 28px 52px rgba(0,0,0,0.14),
+      inset 0 1px 0 rgba(255,255,255,0.9);
+    transform: perspective(900px) rotateX(0deg) rotateY(0deg);
+    transition: box-shadow 0.25s ease, transform 0.18s ease;
+    will-change: transform;
+    transform-style: flat;
+  }
+  @media (prefers-color-scheme: dark) {
+    .card, .output-card {
+      background: rgba(10, 10, 14, 0.88);
+      border-color: rgba(255,255,255,0.10);
+      box-shadow:
+        0 2px 4px  rgba(0,0,0,0.25),
+        0 8px 20px rgba(0,0,0,0.40),
+        0 28px 52px rgba(0,0,0,0.50),
+        inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+  }
+  .card:hover, .output-card:hover {
+    box-shadow:
+      0 4px 8px  rgba(0,0,0,0.06),
+      0 16px 32px rgba(0,0,0,0.14),
+      0 40px 72px rgba(0,0,0,0.18),
+      inset 0 1px 0 rgba(255,255,255,0.9);
+  }
+
+  .output-card { display: none; }
+  .output-card.visible { display: block; animation: slideIn .3s ease-out; }
+
+  /* ── Mode toggle ── */
+  .mode-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; display:flex; align-items:center; gap:5px; }
+  .mode-label i { font-size: 14px; }
+  .mode-group {
+    display: flex; border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md); overflow: hidden; width: 100%; margin-bottom: 1.25rem;
+  }
+  .mode-btn {
+    flex: 1; padding: 9px 16px; font-size: 13px; font-family: inherit;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background .15s, color .15s;
+  }
+  .mode-btn i { font-size: 14px; }
+  .mode-btn.active { background: var(--text); color: var(--bg); }
+  .mode-btn:not(.active):hover { background: var(--bg-secondary); }
+
+  /* ── Input rows ── */
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+  .row.single { grid-template-columns: 1fr; }
+
+  .field-label {
+    font-size: 12px; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 5px; margin-bottom: 6px;
+  }
+  .field-label i { font-size: 14px; }
+
+  input[type=text] {
+    width: 100%; height: 40px; padding: 0 12px;
+    border: 0.5px solid var(--border-md); border-radius: var(--radius-md);
+    background: var(--bg-secondary); color: var(--text);
+    font-size: 14px; font-family: inherit; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input[type=text]:focus { border-color: var(--text-secondary); box-shadow: 0 0 0 3px rgba(100,100,200,.1); }
+  input[type=text]::placeholder { color: var(--text-tertiary); }
+  input[type=text]:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── Format toggle ── */
+  .fmt-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; display:flex; align-items:center; gap:5px; }
+  .fmt-label i { font-size: 14px; }
+  .toggle-group {
+    display: flex; border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md); overflow: hidden; width: fit-content;
+  }
+  .toggle-btn {
+    padding: 8px 22px; font-size: 13px; font-family: inherit;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-secondary); display: flex; align-items: center; gap: 6px;
+    transition: background .15s, color .15s;
+  }
+  .toggle-btn i { font-size: 14px; }
+  .toggle-btn.active { background: var(--text); color: var(--bg); }
+  .toggle-btn:not(.active):hover { background: var(--bg-secondary); }
+
+  /* ── Run button ── */
+  .run-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; height: 46px; background: var(--text); color: var(--bg);
+    border: none; border-radius: var(--radius-md);
+    font-size: 14px; font-weight: 500; font-family: inherit;
+    cursor: pointer; margin-top: 1.25rem;
+    transition: opacity .15s, transform .1s;
+  }
+  .run-btn:hover  { opacity: .85; }
+  .run-btn:active { transform: scale(.98); }
+  .run-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .run-btn i { font-size: 16px; }
+
+  /* ── Output card internals ── */
+  .out-header {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 0.5px solid var(--border);
+  }
+  .out-header i { font-size: 15px; color: var(--text-secondary); }
+  .product-tag  { font-size: 14px; font-weight: 500; }
+  .topic-tag    { font-size: 12px; background: var(--bg-secondary); border: 0.5px solid var(--border); border-radius: 20px; padding: 2px 10px; color: var(--text-secondary); }
+  .fmt-tag      { font-size: 11px; color: var(--text-tertiary); margin-left: auto; }
+
+  /* ── Output body — crisp text ── */
+  .out-body {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.75;
+    position: relative;
+    z-index: 2;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  .out-body ul { padding-left: 1.2rem; margin: .3rem 0 .8rem; }
+  .out-body li { margin-bottom: .35rem; }
+  .out-body p  { margin-bottom: .55rem; }
+  .out-body strong { font-weight: 500; }
+
+  /* ── Sentiment stats ── */
+  .stats-block {
+    background: rgba(245,245,243,0.7);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;
+    position: relative; z-index: 2;
+  }
+  @media (prefers-color-scheme: dark) {
+    .stats-block { background: rgba(37,37,35,0.7); }
+  }
+  .stats-row { display: flex; justify-content: space-between; margin-bottom: .6rem; font-size: 13px; }
+  .stat-item { display: flex; align-items: center; gap: 6px; }
+  .stat-bar-wrap { height: 6px; background: var(--bg-tertiary); border-radius: 3px; margin-bottom: .35rem; overflow: hidden; display: flex; gap: 2px; }
+  .stat-bar { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .bar-pos { background: var(--ok-text); }
+  .bar-neu { background: var(--text-tertiary); }
+  .bar-neg { background: var(--warn-text); }
+  .topics-row { font-size: 12px; color: var(--text-secondary); margin-top: .5rem; }
+  .topic-chip {
+    display: inline-block; background: var(--bg); border: 0.5px solid var(--border);
+    border-radius: 20px; padding: 2px 8px; margin: 2px 2px 0 0; font-size: 11px;
+  }
+
+  /* ── Alerts ── */
+  .alert {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 13px; border-radius: var(--radius-md); padding: 10px 14px; line-height: 1.5;
+  }
+  .alert i { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .alert.warn { color: var(--warn-text); background: var(--warn-bg); border: 0.5px solid var(--warn-border); }
+
+  /* ── Shimmer / thinking ── */
+  .shimmer {
+    background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
+    background-size: 200% 100%; animation: shimmer 1.5s infinite;
+    border-radius: 4px; height: 14px; margin-bottom: 10px;
+  }
+  .shimmer:last-child { width: 65%; }
+  @keyframes shimmer { from{background-position:200% 0} to{background-position:-200% 0} }
+
+  .thinking { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary); }
+  .dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--text-secondary); opacity:.3; animation: pulse 1.2s infinite; }
+  .dots span:nth-child(2){animation-delay:.2s}
+  .dots span:nth-child(3){animation-delay:.4s}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  /* ── Footer ── */
+  .footer-note { margin-top: 1rem; font-size: 12px; color: var(--text-tertiary); display:flex; align-items:center; gap:6px; }
+  .footer-note i { font-size: 13px; }
+  code { font-family: monospace; font-size: 11px; background: var(--bg-secondary); padding: 1px 5px; border-radius: 4px; }
+
+  /* ── Keyframes ── */
+  @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes spin    { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  /* ── Autocomplete ── */
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 999;
+    background: var(--bg); border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md); box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    max-height: 220px; overflow-y: auto; display: none;
+  }
+  .autocomplete-list.open { display: block; animation: slideIn .15s ease-out; }
+  .ac-item {
+    padding: 9px 12px; font-size: 13px; cursor: pointer;
+    color: var(--text); display: flex; align-items: center; gap: 8px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:hover, .ac-item.focused { background: var(--bg-secondary); }
+  .ac-item i { font-size: 14px; color: var(--text-tertiary); flex-shrink: 0; }
+  .ac-highlight { font-weight: 600; color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     VIDEO BACKGROUND
+     👉 STEP 1: Put your video file in the SAME folder as this HTML
+     👉 STEP 2: Change "1773920076.mp4" to your video's filename
+     ============================================================ -->
+<video id="bg-video" autoplay muted loop playsinline>
+  <source src="1773920076.mp4" type="video/mp4">
+</video>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="badge"><i class="ti ti-brand-youtube" style="color: #ff0000;"></i> YouTube RAG</div>
+    <h1>Product sentiment query</h1>
+    <p>Search aggregated YouTube review comments — powered by your local RAG pipeline</p>
+  </div>
+
+  <div class="status-row">
+    <div class="status-pill checking" id="statusPill">
+      <div class="dot"></div>
+      <span id="statusText">Checking backend…</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="mode-label"><i class="ti ti-adjustments-horizontal"></i> Query mode</div>
+    <div class="mode-group" role="group" aria-label="Query mode">
+      <button class="mode-btn active" id="btn-topic" onclick="setMode('topic')">
+        <i class="ti ti-tag"></i> Topic search
+      </button>
+      <button class="mode-btn" id="btn-overall" onclick="setMode('overall')">
+        <i class="ti ti-chart-bar"></i> Overall experience
+      </button>
+    </div>
+
+    <div class="row" id="inputRow">
+      <div class="autocomplete-wrap">
+        <div class="field-label"><i class="ti ti-device-mobile"></i> Product</div>
+        <input type="text" id="product" placeholder="e.g. Samsung Galaxy S25 Ultra" autocomplete="off">
+        <div class="autocomplete-list" id="acList"></div>
+      </div>
+      <div id="topicField">
+        <div class="field-label"><i class="ti ti-tag"></i> Topic</div>
+        <input type="text" id="topic" placeholder="e.g. battery, camera, price" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="fmt-label"><i class="ti ti-layout-list"></i> Output format</div>
+    <div class="toggle-group" role="group" aria-label="Output format">
+      <button class="toggle-btn active" id="btn-bullet" onclick="setFmt('bullet')">
+        <i class="ti ti-list"></i> Bullet
+      </button>
+      <button class="toggle-btn" id="btn-paragraph" onclick="setFmt('paragraph')">
+        <i class="ti ti-align-left"></i> Paragraph
+      </button>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="handleRun()">
+      <i class="ti ti-sparkles"></i> Get summary
+    </button>
+  </div>
+
+  <div class="output-card" id="outputCard">
+    <div class="out-header">
+      <i class="ti ti-device-mobile"></i>
+      <span class="product-tag" id="outProduct"></span>
+      <span class="topic-tag"   id="outTopic"></span>
+      <span class="fmt-tag"     id="outFmt"></span>
+    </div>
+    <div id="statsBlock" class="stats-block" style="display:none"></div>
+    <div class="out-body" id="outputBody"></div>
+  </div>
+
+  <p class="footer-note">
+    <i class="ti ti-server"></i>
+    Results from your MongoDB dataset via Flask at <code>http://localhost:5000</code>
+  </p>
+
+</div>
+
+<script>
+  const API_BASE = "http://localhost:5000";
+  let fmt  = "bullet";
+  let mode = "topic";
+
+  async function checkBackend() {
+    const pill = document.getElementById("statusPill");
+    const txt  = document.getElementById("statusText");
+    try {
+      const res  = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(4000) });
+      const data = await res.json();
+      pill.className = "status-pill online";
+      txt.textContent = `Backend online — ${(data.records ?? 0).toLocaleString()} records`;
+    } catch {
+      pill.className = "status-pill offline";
+      txt.textContent = "Backend offline — run app.py first";
+    }
+  }
+  checkBackend();
+
+  function setMode(v) {
+    mode = v;
+    document.getElementById("btn-topic").classList.toggle("active",   v === "topic");
+    document.getElementById("btn-overall").classList.toggle("active", v === "overall");
+    const topicField = document.getElementById("topicField");
+    const topicInput = document.getElementById("topic");
+    const inputRow   = document.getElementById("inputRow");
+    if (v === "overall") {
+      topicField.style.display = "none";
+      topicInput.disabled      = true;
+      inputRow.classList.add("single");
+    } else {
+      topicField.style.display = "";
+      topicInput.disabled      = false;
+      inputRow.classList.remove("single");
+    }
+  }
+
+  function setFmt(v) {
+    fmt = v;
+    document.getElementById("btn-bullet").classList.toggle("active",    v === "bullet");
+    document.getElementById("btn-paragraph").classList.toggle("active", v === "paragraph");
+  }
+
+  function renderMarkdown(text) {
+    let lines = text.split("\n"), html = "", inList = false;
+    for (let raw of lines) {
+      const line = raw.trim();
+      if (!line) {
+        if (inList) { html += "</ul>"; inList = false; }
+        html += "<br>"; continue;
+      }
+      if (/^\*\*(.+)\*\*$/.test(line)) {
+        if (inList) { html += "</ul>"; inList = false; }
+        html += `<p style="font-weight:500;margin-bottom:.4rem">${line.replace(/\*\*/g,"")}</p>`;
+        continue;
+      }
+      if (line.startsWith("- ") || line.startsWith("• ")) {
+        if (!inList) { html += '<ul>'; inList = true; }
+        html += `<li>${inline(line.slice(2))}</li>`; continue;
+      }
+      if (/^(pros|cons):?$/i.test(line)) {
+        if (inList) { html += "</ul>"; inList = false; }
+        const lbl   = line.replace(/:$/,"");
+        const color = /pros/i.test(lbl) ? "var(--ok-text)" : "var(--warn-text)";
+        html += `<p style="font-weight:500;color:${color};margin:.8rem 0 .3rem">${lbl[0].toUpperCase()+lbl.slice(1).toLowerCase()}</p>`;
+        continue;
+      }
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<p>${inline(line)}</p>`;
+    }
+    if (inList) html += "</ul>";
+    return html;
+  }
+
+  function inline(s) {
+    return s
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g,     "<em>$1</em>");
+  }
+
+  function parseOverallResponse(text) {
+    const stats   = { total: 0, pos: 0, neu: 0, neg: 0, topics: [] };
+    const lines   = text.split("\n");
+    let summaryStart = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const total = l.match(/Total Comments\s*:\s*(\d+)/);
+      const pos   = l.match(/Positive\s*:\s*(\d+)/);
+      const neu   = l.match(/Neutral\s*:\s*(\d+)/);
+      const neg   = l.match(/Negative\s*:\s*(\d+)/);
+      const top   = l.match(/Top Topics\s*:\s*(.+)/);
+      if (total) stats.total = parseInt(total[1]);
+      if (pos)   stats.pos   = parseInt(pos[1]);
+      if (neu)   stats.neu   = parseInt(neu[1]);
+      if (neg)   stats.neg   = parseInt(neg[1]);
+      if (top)   stats.topics = top[1].split(",").map(t => t.trim()).filter(t => t.length > 2);
+      if (l.startsWith("===") && i > 2) { summaryStart = i + 1; break; }
+    }
+    const summary = lines.slice(summaryStart).join("\n").trim();
+    return { stats, summary };
+  }
+
+  function renderStatsBlock(stats) {
+    if (!stats.total) return "";
+    const pct = n => stats.total ? ((n / stats.total) * 100).toFixed(1) : 0;
+    const pw  = pct(stats.pos), nuw = pct(stats.neu), nw = pct(stats.neg);
+    const chips = stats.topics.map(t => `<span class="topic-chip">${t}</span>`).join("");
+    return `
+      <div class="stats-row">
+        <span class="stat-item">📊 <strong>${stats.total.toLocaleString()}</strong> comments</span>
+        <span class="stat-item" style="color:var(--ok-text)">😊 ${stats.pos.toLocaleString()} (${pw}%)</span>
+        <span class="stat-item" style="color:var(--text-secondary)">😐 ${stats.neu.toLocaleString()} (${nuw}%)</span>
+        <span class="stat-item" style="color:var(--warn-text)">😠 ${stats.neg.toLocaleString()} (${nw}%)</span>
+      </div>
+      <div class="stat-bar-wrap">
+        <div class="stat-bar bar-pos" style="width:${pw}%"></div>
+        <div class="stat-bar bar-neu" style="width:${nuw}%"></div>
+        <div class="stat-bar bar-neg" style="width:${nw}%"></div>
+      </div>
+      ${stats.topics.length ? `<div class="topics-row">🔥 Top topics: ${chips}</div>` : ""}
+    `;
+  }
+
+  async function handleRun() {
+    const product = document.getElementById("product").value.trim();
+    const topic   = document.getElementById("topic").value.trim();
+    const card    = document.getElementById("outputCard");
+    const body    = document.getElementById("outputBody");
+    const stats   = document.getElementById("statsBlock");
+    const btn     = document.getElementById("runBtn");
+
+    card.classList.remove("visible");
+    void card.offsetWidth;
+    card.classList.add("visible");
+    stats.style.display = "none";
+
+    if (!product) {
+      document.getElementById("outProduct").textContent = "";
+      document.getElementById("outTopic").textContent   = "";
+      document.getElementById("outFmt").textContent     = "";
+      body.innerHTML = `<div class="alert warn"><i class="ti ti-alert-triangle"></i> Please enter a product name.</div>`;
+      return;
+    }
+    if (mode === "topic" && !topic) {
+      body.innerHTML = `<div class="alert warn"><i class="ti ti-alert-triangle"></i> Please enter a topic, or switch to Overall Experience mode.</div>`;
+      return;
+    }
+
+    document.getElementById("outProduct").textContent = product;
+    document.getElementById("outTopic").textContent   = mode === "overall" ? "Overall experience" : topic;
+    document.getElementById("outFmt").textContent     = fmt === "bullet" ? "bullet list" : "paragraph";
+
+    btn.disabled = true;
+    btn.innerHTML = `<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Fetching from RAG…`;
+    body.innerHTML = `<div class="thinking"><div class="dots"><span></span><span></span><span></span></div> Querying MongoDB &amp; running Flan-T5…</div>`;
+
+    const shimmerTimer = setTimeout(() => {
+      if (body.querySelector(".thinking"))
+        body.innerHTML = `<div class="shimmer"></div><div class="shimmer"></div><div class="shimmer"></div><div class="shimmer"></div>`;
+    }, 1300);
+
+    try {
+      const endpoint = mode === "overall" ? "/api/overall" : "/api/summary";
+      const payload  = mode === "overall"
+        ? { product, format: fmt }
+        : { product, topic, format: fmt };
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      clearTimeout(shimmerTimer);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (!data.summary) {
+        body.innerHTML = `<div class="alert warn"><i class="ti ti-mood-sad"></i> No summary returned.</div>`;
+      } else if (mode === "overall") {
+        const { stats: s, summary } = parseOverallResponse(data.summary);
+        const statsHtml = renderStatsBlock(s);
+        if (statsHtml) { stats.innerHTML = statsHtml; stats.style.display = "block"; }
+        body.innerHTML = summary ? renderMarkdown(summary) : "";
+      } else {
+        body.innerHTML = renderMarkdown(data.summary);
+      }
+    } catch (e) {
+      clearTimeout(shimmerTimer);
+      body.innerHTML = `
+        <div class="alert warn">
+          <i class="ti ti-wifi-off"></i>
+          <div>
+            <strong>Could not reach the backend.</strong><br>
+            Make sure <code>app.py</code> is running:<br>
+            <code>python app.py</code><br><br>
+            Error: ${e.message}
+          </div>
+        </div>`;
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<i class="ti ti-sparkles"></i> Get summary`;
+  }
+
+  /* ── Autocomplete ── */
+  let allProducts  = [];
+  let acFocusIndex = -1;
+
+  async function loadProductList() {
+    try {
+      const res  = await fetch(`${API_BASE}/api/products`);
+      const data = await res.json();
+      allProducts = data.products || [];
+    } catch {}
+  }
+  loadProductList();
+
+  function getAcItems() { return document.querySelectorAll("#acList .ac-item"); }
+
+  function openAc(matches, query) {
+    const list = document.getElementById("acList");
+    if (!matches.length) { closeAc(); return; }
+    acFocusIndex = -1;
+    list.innerHTML = matches.slice(0, 8).map(name => {
+      const idx = name.toLowerCase().indexOf(query.toLowerCase());
+      let label = escHtml(name);
+      if (idx !== -1) {
+        label = escHtml(name.slice(0, idx))
+          + `<span class="ac-highlight">${escHtml(name.slice(idx, idx + query.length))}</span>`
+          + escHtml(name.slice(idx + query.length));
+      }
+      return `<div class="ac-item" data-name="${escHtml(name)}" onmousedown="pickAc('${escHtml(name)}')">
+                <i class="ti ti-device-mobile"></i>${label}
+              </div>`;
+    }).join("");
+    list.classList.add("open");
+  }
+
+  function closeAc() { document.getElementById("acList").classList.remove("open"); acFocusIndex = -1; }
+  function pickAc(name) {
+    document.getElementById("product").value = name;
+    closeAc();
+    if (mode === "topic") document.getElementById("topic").focus();
+  }
+  function escHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  const productInput = document.getElementById("product");
+  productInput.addEventListener("input", () => {
+    const q = productInput.value.trim();
+    if (q.length < 1) { closeAc(); return; }
+    openAc(allProducts.filter(p => p.toLowerCase().includes(q.toLowerCase())), q);
+  });
+  productInput.addEventListener("keydown", e => {
+    const items = getAcItems();
+    const list  = document.getElementById("acList");
+    if (!list.classList.contains("open")) {
+      if (e.key === "Enter") { if (mode === "topic") document.getElementById("topic").focus(); else handleRun(); }
+      return;
+    }
+    if (e.key === "ArrowDown") { e.preventDefault(); acFocusIndex = Math.min(acFocusIndex + 1, items.length - 1); items.forEach((el, i) => el.classList.toggle("focused", i === acFocusIndex)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); acFocusIndex = Math.max(acFocusIndex - 1, 0); items.forEach((el, i) => el.classList.toggle("focused", i === acFocusIndex)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (acFocusIndex >= 0 && items[acFocusIndex]) { pickAc(items[acFocusIndex].dataset.name); } else { closeAc(); if (mode === "topic") document.getElementById("topic").focus(); else handleRun(); } }
+    else if (e.key === "Escape") { closeAc(); }
+  });
+  document.addEventListener("mousedown", e => { if (!e.target.closest(".autocomplete-wrap")) closeAc(); });
+  productInput.addEventListener("blur", () => { setTimeout(closeAc, 150); });
+  document.getElementById("topic").addEventListener("keydown", e => { if (e.key === "Enter") handleRun(); });
+</script>
+
+<script>
+/* ── Particle network background ── */
+(function () {
+  const canvas = document.getElementById("bg-canvas");
+  const ctx    = canvas.getContext("2d");
+  const PARTICLE_COUNT = 72, MAX_DIST = 140, SPEED = 0.35, PARTICLE_RADIUS = 2;
+  let W, H, particles = [], dpr = window.devicePixelRatio || 1;
+
+  function isDark() { return window.matchMedia("(prefers-color-scheme: dark)").matches; }
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function randomParticle() {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (Math.random() * 0.5 + 0.2) * SPEED;
+    return { x: Math.random()*W, y: Math.random()*H, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, r: PARTICLE_RADIUS*(Math.random()*0.6+0.7) };
+  }
+  function init() { resize(); particles = Array.from({ length: PARTICLE_COUNT }, randomParticle); }
+  function getColors() {
+    const dark = isDark();
+    return { dot: dark?"rgba(160,160,140,0.55)":"rgba(80,80,70,0.35)", line: dark?"rgba(160,160,140,":"rgba(80,80,70," };
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const { dot, line } = getColors();
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -10) p.x = W+10; if (p.x > W+10) p.x = -10;
+      if (p.y < -10) p.y = H+10; if (p.y > H+10) p.y = -10;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fillStyle = dot; ctx.fill();
+      for (let j = i+1; j < particles.length; j++) {
+        const q = particles[j];
+        const dx = p.x-q.x, dy = p.y-q.y, dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist < MAX_DIST) {
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+          ctx.strokeStyle = line + ((1-dist/MAX_DIST)*0.4) + ")"; ctx.lineWidth = 0.8; ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener("resize", resize);
+  init(); draw();
+})();
+
+/* ── 3D mouse-parallax tilt ──
+   👈 ADJUST: const TILT = 6  →  higher = more dramatic tilt */
+(function () {
+  const TILT = 2;
+  const cards = () => document.querySelectorAll('.card, .output-card');
+
+  document.addEventListener('mousemove', (e) => {
+    const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+    const dx = (e.clientX - cx) / cx, dy = (e.clientY - cy) / cy;
+    cards().forEach(card => {
+      const rect = card.getBoundingClientRect();
+      const rx = ((e.clientY - (rect.top  + rect.height/2)) / (rect.height/2)) * TILT;
+      const ry = ((e.clientX - (rect.left + rect.width /2)) / (rect.width /2)) * TILT;
+      card.style.transform = `perspective(900px) rotateX(${-rx*0.5}deg) rotateY(${ry*0.5}deg)`;
+    });
+    const wrap = document.querySelector('.wrap');
+    if (wrap) wrap.style.transform = `translate(${dx*-4}px, ${dy*-4}px)`;
+  });
+
+  document.addEventListener('mouseleave', () => {
+    cards().forEach(card => { card.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)'; });
+    const wrap = document.querySelector('.wrap');
+    if (wrap) wrap.style.transform = 'translate(0,0)';
+  });
+})();
+</script>
+</body>
+</html>
