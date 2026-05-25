@@ -67,7 +67,7 @@ Instead of reading hundreds of comment sections yourself, this system fetches, t
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="assets/Screenshot_2026-05-26_002415.png" width="100%"/>
+      <img src="assets/Screenshot 2026-05-26 002415.png" width="100%"/>
       <br/><b>Topic Search — iPhone 17 Pro · Camera</b>
       <br/><sub>Live query interface with product autocomplete and 88,498 records connected</sub>
     </td>
