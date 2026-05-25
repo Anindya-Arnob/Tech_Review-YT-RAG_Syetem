@@ -72,19 +72,19 @@ Instead of reading hundreds of comment sections yourself, this system fetches, t
       <br/><sub>Live query interface with product autocomplete and 88,498 records connected</sub>
     </td>
     <td align="center" width="50%">
-      <img src="assets/Screenshot_2026-05-26_002438.png" width="100%"/>
+      <img src="assets/Screenshot 2026-05-26 002648.png" width="100%"/>
       <br/><b>AI-Generated Pros & Cons Summary</b>
       <br/><sub>LLaMA 3 structured summary grounded in real user comments</sub>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="assets/Screenshot_2026-05-26_002648.png" width="100%"/>
+      <img src="assets/Screenshot 2026-05-26 002648.png" width="100%"/>
       <br/><b>Overall Experience — Samsung Galaxy S26</b>
       <br/><sub>1,171 comments · sentiment breakdown · top topics · paragraph narrative</sub>
     </td>
     <td align="center" width="50%">
-      <img src="assets/Screenshot_2026-05-26_002752.png" width="100%"/>
+      <img src="assets/Screenshot 2026-05-26 002752.png" width="100%"/>
       <br/><b>Topic Search — iMac M4 · Price</b>
       <br/><sub>Nuanced pros/cons extracted from real reviewer opinions</sub>
     </td>
